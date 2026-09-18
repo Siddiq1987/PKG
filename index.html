@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Penilaian Kinerja Guru</title>
+    <link rel="icon" href="https://pngup.com/K1Vd/ndik ya.png" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        .excel-table {
+            border-collapse: collapse;
+            width: 100%;
+            background-color: white;
+            table-layout: fixed;
+        }
+        .excel-table th, .excel-table td {
+            border: 1px solid #000000;
+            padding: 3px 6px;
+            font-size: 11px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            vertical-align: middle;
+        }
+        .excel-header {
+            background-color: #d3d3d3 !important;
+            color: #000000;
+            font-weight: bold;
+            text-align: center;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .excel-subheader {
+            background-color: #e5e7eb !important;
+            color: #000000;
+            font-weight: bold;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .score-cell {
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+            user-select: none;
+            transition: background-color 0.1s;
+        }
+        .score-cell:hover {
+            background-color: #bfdbfe;
+        }
+
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 1.3cm;
+            }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { 
+                background: white !important; 
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+            }
+            
+            main {
+                padding: 0 !important;
+                margin: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+
+            input:not([type="checkbox"]), textarea {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                outline: none !important;
+                resize: none !important;
+            }
+
+            input.note-input:placeholder-shown {
+                color: transparent !important;
+            }
+            input.note-input:placeholder-shown::-webkit-input-placeholder {
+                color: transparent !important;
+            }
+
+            textarea.note-input:placeholder-shown {
+                color: transparent !important;
+            }
+            textarea.note-input:placeholder-shown::-webkit-input-placeholder {
+                color: transparent !important;
+            }
+
+            textarea#rekomendasi-teks:placeholder-shown {
+                color: transparent !important;
+            }
+
+            .page-1 {
+                page-break-after: always;
+                break-after: page;
+                margin-top: 0 !important;
+            }
+
+            .page-2 {
+                margin-top: 0 !important;
+            }
+        }
+        
+        .print-only { display: none; }
+    </style>
+</head>
+<body class="bg-blue-50 text-slate-900 min-h-screen flex flex-col">
+
+    <header class="bg-blue-800 text-white shadow sticky top-0 z-50 no-print">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <img src="https://pngup.com/K1Vd/ndik.png" alt="Icon" class="w-20 h-20 object-contain">
+                <div>
+                    <h1 class="text-sm font-bold tracking-tight">APLIKASI PENILAIAN KINERJA GURU (PKG)</h1>
+                    <p class="text-[11px] text-blue-200">Format Lembar Penilaian Resmi (Auto-Save & Backup)</p>
+                </div>
+            </div>
+            <div class="flex items-center flex-wrap gap-2">
+                <button onclick="exportDataJSON()" class="bg-blue-700 hover:bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1.5 shadow-sm" title="Backup Data JSON">
+                    <i class="fa-solid fa-download"></i><span>Ekspor Data</span>
+                </button>
+                <label class="bg-blue-700 hover:bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1.5 shadow-sm cursor-pointer" title="Pulihkan Data JSON">
+                    <i class="fa-solid fa-upload"></i><span>Impor Data</span>
+                    <input type="file" id="import-file" accept=".json" class="hidden" onchange="importDataJSON(event)">
+                </label>
+                <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1.5 shadow-sm">
+                    <i class="fa-solid fa-file-excel"></i><span>Unduh Excel</span>
+                </button>
+                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1.5 shadow-sm">
+                    <i class="fa-solid fa-print"></i><span>Cetak A4</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-4xl w-full mx-auto px-4 py-6 space-y-6">
+
+        <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center space-x-2 text-xs no-print">
+            <i class="fa-solid fa-circle-check text-blue-400"></i>
+            <span id="toast-msg">Data berhasil diperbarui!</span>
+        </div>
+
+        <div class="space-y-4">
+            
+            <div class="page-1 space-y-4">
+                <table class="excel-table">
+                    <colgroup>
+                        <col style="width: 30%;">
+                        <col style="width: 70%;">
+                    </colgroup>
+                    <tr>
+                        <th colspan="2" id="header-title-text" class="excel-header text-sm py-2">
+                            PENILAIAN KINERJA GURU<br>SMP ISLAM TERPADU TRI SUKSES
+                        </th>
+                    </tr>
+                    
+                    <tr>
+                        <td class="font-semibold bg-slate-50">Nama Sekolah</td>
+                        <td><input type="text" id="id_sekolah" class="w-full px-2 py-1 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs bg-white" value="SMP Islam Terpadu Tri Sukses" oninput="updateIdentitas()"></td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold bg-slate-50">Tahun Ajaran</td>
+                        <td><input type="text" id="id_tahun" class="w-full px-2 py-1 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs bg-white" value="2026/2027" oninput="updateIdentitas()"></td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold bg-slate-50">Nama Guru</td>
+                        <td><input type="text" id="id_nama" class="w-full px-2 py-1 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs bg-white" value="Ash Siddiq ST" oninput="updateIdentitas()"></td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold bg-slate-50">Mata Pelajaran</td>
+                        <td><input type="text" id="id_mapel" class="w-full px-2 py-1 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs bg-white" value="Informatika" oninput="updateIdentitas()"></td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold bg-slate-50">Hari/Tanggal Observasi</td>
+                        <td><input type="text" id="id_tanggal" class="w-full px-2 py-1 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs bg-white" value="21/09/2026" oninput="updateIdentitas()"></td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold bg-slate-50">Penilai</td>
+                        <td><input type="text" id="id_penilai" class="w-full px-2 py-1 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs bg-white" value="Rini Setyowati, M.Pd" oninput="updateIdentitas()"></td>
+                    </tr>
+                </table>
+
+                <table class="excel-table">
+                    <colgroup>
+                        <col style="width: 12%;">
+                        <col style="width: 88%;">
+                    </colgroup>
+                    <tr>
+                        <th class="excel-header">Skor</th>
+                        <th class="excel-header">Kriteria</th>
+                    </tr>
+                    <tr>
+                        <td class="text-center font-bold">4</td>
+                        <td>Sangat Baik (terlaksana konsisten dan berkualitas)</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center font-bold">3</td>
+                        <td>Baik (terlaksana sesuai standar)</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center font-bold">2</td>
+                        <td>Cukup (terlaksana sebagian)</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center font-bold">1</td>
+                        <td>Kurang (belum/tidak terlaksana)</td>
+                    </tr>
+                </table>
+
+                <div id="competencies-container-p1" class="space-y-4"></div>
+            </div>
+
+            <div class="page-2 space-y-4 pt-2">
+                <div id="competencies-container-p2" class="space-y-4"></div>
+
+                <div>
+                    <table class="excel-table" id="rekap-table">
+                        <colgroup>
+                            <col style="width: 40%;">
+                            <col style="width: 30%;">
+                            <col style="width: 30%;">
+                        </colgroup>
+                        <tr>
+                            <th colspan="3" class="excel-header py-1.5">REKAPITULASI PENILAIAN KINERJA GURU</th>
+                        </tr>
+                        <tr class="excel-subheader">
+                            <td class="text-center font-bold">Kompetensi</td>
+                            <td class="text-center font-bold">Rata-rata Skor</td>
+                            <td class="text-center font-bold">Kategori</td>
+                        </tr>
+                        <tbody id="rekap-tbody"></tbody>
+                    </table>
+                </div>
+
+
+                <table class="excel-table">
+                    <tr>
+                        <th class="excel-header">CATATAN/REKOMENDASI KEPALA SEKOLAH</th>
+                    </tr>
+                    <tr>
+                        <td class="p-2">
+                            <textarea id="rekomendasi-teks" rows="3" oninput="updateRekomendasi(this.value)" class="note-input w-full p-2 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-xs resize-y" placeholder=""></textarea>
+                        </td>
+                    </tr>
+                </table>
+
+                <div class="pt-2 flex justify-between items-start text-xs px-4">
+                    <!-- Guru Signature -->
+                    <div class="w-64 text-center space-y-10">
+                        <div class="space-y-1">
+                            <div class="no-print h-7"></div>
+                            <p class="font-bold print-only invisible">Depok, Juni 2026</p>
+                            <p class="font-bold pt-1 text-left">Guru yang Dinilai</p>
+                        </div>
+                        <div class="pt-12">
+                            <input type="text" id="id_guru_ttd" class="font-bold underline text-left w-full px-2 py-1 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" value="Ash Siddiq ST" oninput="updateIdentitas()">
+                        </div>
+                    </div>
+
+                    <!-- Kepala Sekolah Signature -->
+                    <div class="w-64 text-center space-y-10">
+                        <div class="space-y-1">
+                            <div class="flex justify-center items-center space-x-1 no-print">
+                                <input type="text" id="ttd_lokasi_input" class="font-bold text-left px-1 py-1 rounded border border-slate-300 w-28 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" value="Depok" oninput="updateSignatureSettings()">
+                                <input type="text" id="ttd_tanggal_input" class="font-bold text-left px-1 py-1 rounded border border-slate-300 w-32 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" value="Juni 2026" oninput="updateSignatureSettings()">
+                            </div>
+                            <p id="tanda-tangan-lokasi-tanggal" class="font-bold text-left print-only">Depok, Juni 2026</p>
+                            <p class="font-bold pt-1 text-left">Kepala Sekolah</p>
+                        </div>
+                        <div class="pt-12">
+                            <input type="text" id="id_kepala_sekolah" class="font-bold underline text-left w-full px-2 py-1 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" value="Ash Siddiq ST" oninput="updateIdentitas()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        let pkgData = [
+            {
+                code: "A",
+                title: "Kompetensi Profesional",
+                indikator: [
+                    { id: 1, text: "Memiliki kualifikasi dan kompetensi", skor: 4, catatan: "" },
+                    { id: 2, text: "Menguasai Tujuan Pendidikan", skor: 4, catatan: "" },
+                    { id: 3, text: "Menguasai disiplin ilmu yang di ampu", skor: 4, catatan: "" },
+                    { id: 4, text: "Memahami potensi dan kebutuhan belajar murid", skor: 4, catatan: "" },
+                    { id: 5, text: "Mengembangkan praktik profesional", skor: 4, catatan: "" }
+                ]
+            },
+            {
+                code: "B",
+                title: "Kompetensi Pedagogis",
+                indikator: [
+                    { id: 1, text: "Merancang dan memfasilitasi pengalaman belajar murid", skor: 4, catatan: "" },
+                    { id: 2, text: "Melaksanakan pemeblajaran yang responsive terhadap", skor: 3, catatan: "" },
+                    { id: 3, text: "Menciptakan proses pembelajaran yang berkesadaran,", skor: 4, catatan: "" },
+                    { id: 4, text: "Mengintegrasikan tehnologi dalam pembelajaran untuk", skor: 4, catatan: "" },
+                    { id: 5, text: "Menerapkan strategi pembelajaran sesuai karakteristik", skor: 4, catatan: "" },
+                    { id: 6, text: "Melaksanakan asesmen untuk mengetahui kebutuhan", skor: 4, catatan: "" }
+                ]
+            },
+            {
+                code: "C",
+                title: "Kompetensi Kepribadian",
+                indikator: [
+                    { id: 1, text: "Menunjukkan integritas dan kejujuran", skor: 4, catatan: "" },
+                    { id: 2, text: "Disiplin dalam melaksanakan tugas", skor: 4, catatan: "" },
+                    { id: 3, text: "Bertanggung jawab terhadap tugas profesi", skor: 4, catatan: "" },
+                    { id: 4, text: "Disiplin positif dalam menjalankan tugas", skor: 4, catatan: "" },
+                    { id: 5, text: "Menjadi teladan bagi peserta didik dan warga sekolah", skor: 4, catatan: "" },
+                    { id: 6, text: "Berpakaian Rapi dan Sopan", skor: 4, catatan: "" }
+                ]
+            },
+            {
+                code: "D",
+                title: "Kompetensi Sosial",
+                indikator: [
+                    { id: 1, text: "Berkomunikasi efektif, inklusif dan empatik sesuai dengan", skor: 3, catatan: "" },
+                    { id: 2, text: "Berkolaborasi dengan murid, sesame pendidik, tenaga", skor: 3, catatan: "" },
+                    { id: 3, text: "Berpartisipasi aktif dalam organisasi dan komunitas", skor: 3, catatan: "" }
+                ]
+            }
+        ];
+
+        let identitas = {
+            sekolah: "SMP Islam Terpadu Tri Sukses",
+            tahun: "2026/2027",
+            nama: "Ash Siddiq ST",
+            mapel: "Informatika",
+            tanggal: "21/09/2026",
+            penilai: "Rini Setyowati, M.Pd",
+            kepalaSekolah: "Ash Siddiq ST",
+            lokasiTtd: "Depok",
+            tanggalTtd: "Juni 2026",
+            rekomendasi: ""
+        };
+
+        const STORAGE_KEY = "pkg_app_data_2026_v1";
+
+        window.onload = function() {
+            loadFromStorage();
+            renderApp();
+            updateSignatureSettings();
+        };
+
+        function saveToStorage() {
+            const dataToSave = {
+                pkgData,
+                identitas
+            };
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+            } catch (e) {
+                console.error("Gagal menyimpan ke penyimpanan lokal", e);
+            }
+        }
+
+        function loadFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.pkgData) pkgData = parsed.pkgData;
+                    if (parsed.identitas) {
+                        identitas = { ...identitas, ...parsed.identitas };
+                        
+                        // Populate inputs
+                        document.getElementById('id_sekolah').value = identitas.sekolah;
+                        document.getElementById('id_tahun').value = identitas.tahun;
+                        document.getElementById('id_nama').value = identitas.nama;
+                        document.getElementById('id_mapel').value = identitas.mapel;
+                        document.getElementById('id_tanggal').value = identitas.tanggal;
+                        document.getElementById('id_penilai').value = identitas.penilai;
+                        document.getElementById('id_kepala_sekolah').value = identitas.kepalaSekolah;
+                        document.getElementById('id_guru_ttd').value = identitas.nama;
+                        document.getElementById('ttd_lokasi_input').value = identitas.lokasiTtd;
+                        document.getElementById('ttd_tanggal_input').value = identitas.tanggalTtd;
+                        document.getElementById('rekomendasi-teks').value = identitas.rekomendasi || "";
+                    }
+                }
+            } catch (e) {
+                console.error("Gagal memuat data", e);
+            }
+        }
+
+        function exportDataJSON() {
+            const dataToExport = {
+                pkgData,
+                identitas
+            };
+            const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `PKG_${identitas.nama.replace(/[^a-zA-Z0-9]/g, '_')}_Backup.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Data PKG berhasil diekspor (Backup JSON)!');
+        }
+
+        function importDataJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.pkgData && imported.identitas) {
+                        pkgData = imported.pkgData;
+                        identitas = imported.identitas;
+                        saveToStorage();
+                        
+                        // Update UI fields
+                        document.getElementById('id_sekolah').value = identitas.sekolah;
+                        document.getElementById('id_tahun').value = identitas.tahun;
+                        document.getElementById('id_nama').value = identitas.nama;
+                        document.getElementById('id_mapel').value = identitas.mapel;
+                        document.getElementById('id_tanggal').value = identitas.tanggal;
+                        document.getElementById('id_penilai').value = identitas.penilai;
+                        document.getElementById('id_kepala_sekolah').value = identitas.kepalaSekolah;
+                        document.getElementById('id_guru_ttd').value = identitas.nama;
+                        document.getElementById('ttd_lokasi_input').value = identitas.lokasiTtd || "Depok";
+                        document.getElementById('ttd_tanggal_input').value = identitas.tanggalTtd || "Juni 2026";
+                        document.getElementById('rekomendasi-teks').value = identitas.rekomendasi || "";
+
+                        renderApp();
+                        updateSignatureSettings();
+                        showToast('Data PKG berhasil diimpor!');
+                    } else {
+                        showToast('Format file JSON tidak valid!');
+                    }
+                } catch (err) {
+                    showToast('Gagal membaca file JSON!');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2500);
+        }
+
+        function updateIdentitas() {
+            identitas.sekolah = document.getElementById('id_sekolah').value;
+            identitas.tahun = document.getElementById('id_tahun').value;
+            identitas.nama = document.getElementById('id_nama').value;
+            identitas.mapel = document.getElementById('id_mapel').value;
+            identitas.tanggal = document.getElementById('id_tanggal').value;
+            identitas.penilai = document.getElementById('id_penilai').value;
+            identitas.kepalaSekolah = document.getElementById('id_kepala_sekolah').value;
+            
+            document.getElementById('id_guru_ttd').value = identitas.nama;
+            document.getElementById('header-title-text').innerHTML =`PENILAIAN KINERJA GURU<br><span>${identitas.sekolah.toUpperCase()}</span>`;
+            saveToStorage();
+        }
+
+        function updateSignatureSettings() {
+            identitas.lokasiTtd = document.getElementById('ttd_lokasi_input').value;
+            identitas.tanggalTtd = document.getElementById('ttd_tanggal_input').value;
+            document.getElementById('tanda-tangan-lokasi-tanggal').innerText = `${identitas.lokasiTtd}, ${identitas.tanggalTtd}`;
+            saveToStorage();
+        }
+
+        function updateRekomendasi(val) {
+            identitas.rekomendasi = val;
+            saveToStorage();
+        }
+
+        function setScore(compIndex, indIndex, score) {
+            pkgData[compIndex].indikator[indIndex].skor = score;
+            renderApp();
+            saveToStorage();
+            showToast('Skor diperbarui');
+        }
+
+        function updateCatatan(compIndex, indIndex, val) {
+            pkgData[compIndex].indikator[indIndex].catatan = val;
+            saveToStorage();
+        }
+
+        function getCategory(avg) {
+            if (avg >= 3.51) return "Sangat Baik";
+            if (avg >= 2.51) return "Baik";
+            if (avg >= 1.51) return "Cukup";
+            return "Kurang";
+        }
+
+        function renderApp() {
+            const containerP1 = document.getElementById('competencies-container-p1');
+            const containerP2 = document.getElementById('competencies-container-p2');
+            containerP1.innerHTML = '';
+            containerP2.innerHTML = '';
+
+            let totalSumAvg = 0;
+
+            pkgData.forEach((comp, cIdx) => {
+                let sumSkor = 0;
+                comp.indikator.forEach(ind => { sumSkor += ind.skor; });
+                let avgSkor = (sumSkor / comp.indikator.length);
+                totalSumAvg += avgSkor;
+
+                let headerLabel = (cIdx === 2 || cIdx === 3) ? 'Bukti Perilaku' : 'Catatan/Bukti';
+
+                let html = `
+                    <table class="excel-table">
+                        <colgroup>
+                            <col style="width: 5%;">
+                            <col style="width: 30%;">
+                            <col style="width: 5%;">
+                            <col style="width: 5%;">
+                            <col style="width: 5%;">
+                            <col style="width: 5%;">
+                            <col style="width: 45%;">
+                        </colgroup>
+                        <tr>
+                            <th colspan="7" class="excel-header text-left px-2 py-1.5">
+                                ${comp.code}. ${comp.title}
+                            </th>
+                        </tr>
+                        <tr class="excel-subheader text-center">
+                            <td class="font-bold">No</td>
+                            <td class="text-left font-bold">Indikator Kinerja Guru</td>
+                            <td class="font-bold">1</td>
+                            <td class="font-bold">2</td>
+                            <td class="font-bold">3</td>
+                            <td class="font-bold">4</td>
+                            <td class="font-bold">${headerLabel}</td>
+                        </tr>
+                `;
+
+                comp.indikator.forEach((ind, iIdx) => {
+                    html += `
+                        <tr>
+                            <td class="text-center">${ind.id}</td>
+                            <td>${ind.text}</td>
+                            <td class="score-cell" onclick="setScore(${cIdx}, ${iIdx}, 1)">${ind.skor === 1 ? 'v' : ''}</td>
+                            <td class="score-cell" onclick="setScore(${cIdx}, ${iIdx}, 2)">${ind.skor === 2 ? 'v' : ''}</td>
+                            <td class="score-cell" onclick="setScore(${cIdx}, ${iIdx}, 3)">${ind.skor === 3 ? 'v' : ''}</td>
+                            <td class="score-cell" onclick="setScore(${cIdx}, ${iIdx}, 4)">${ind.skor === 4 ? 'v' : ''}</td>
+                            <td class="p-1">
+                                <textarea rows="2" oninput="updateCatatan(${cIdx}, ${iIdx}, this.value)" placeholder="" class="note-input w-full px-1.5 py-1 rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-[11px] resize-y">${ind.catatan}</textarea>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        <tr class="excel-subheader">
+                            <td colspan="2" class="text-right font-bold">Nilai (di isi dengan angka sesuai kolom) :</td>
+                            <td colspan="4" class="text-center font-bold">${sumSkor}</td>
+                            <td class="text-center font-bold">${avgSkor.toFixed(2)}</td>
+                        </tr>
+                    </table>
+                `;
+
+                if (cIdx === 0 || cIdx === 1) {
+                    containerP1.innerHTML += html;
+                } else {
+                    containerP2.innerHTML += html;
+                }
+            });
+
+            let overallAvg = totalSumAvg / pkgData.length;
+            const rekapTbody = document.getElementById('rekap-tbody');
+            rekapTbody.innerHTML = '';
+
+            pkgData.forEach(comp => {
+                let sumSkor = 0;
+                comp.indikator.forEach(ind => { sumSkor += ind.skor; });
+                let avgSkor = sumSkor / comp.indikator.length;
+
+                rekapTbody.innerHTML += `
+                    <tr>
+                        <td class="font-medium">${comp.title.replace('Kompetensi ', '')}</td>
+                        <td class="text-center font-bold">${avgSkor.toFixed(2)}</td>
+                        <td class="text-center font-semibold text-emerald-800">${getCategory(avgSkor)}</td>
+                    </tr>
+                `;
+            });
+
+            rekapTbody.innerHTML += `
+                <tr class="excel-subheader">
+                    <td class="font-bold">Nilai Akhir PKG</td>
+                    <td class="text-center font-bold">${overallAvg.toFixed(2)}</td>
+                    <td class="text-center font-bold text-emerald-800">${getCategory(overallAvg)}</td>
+                </tr>
+            `;
+        }
+
+        function exportToExcel() {
+            let wb = XLSX.utils.book_new();
+            let data = [
+                [`PENILAIAN KINERJA GURU ${identitas.sekolah.toUpperCase()}`],
+                [],
+                ["IDENTITAS"],
+                ["Nama Sekolah", identitas.sekolah],
+                ["Tahun Ajaran", identitas.tahun],
+                ["Nama Guru", identitas.nama],
+                ["Mata Pelajaran", identitas.mapel],
+                ["Hari/Tanggal Observasi", identitas.tanggal],
+                ["Penilai", identitas.penilai],
+                []
+            ];
+
+            pkgData.forEach(comp => {
+                data.push([`${comp.code}. ${comp.title}`]);
+                data.push(["No", "Indikator Kinerja", "1", "2", "3", "4", "Catatan/Bukti"]);
+                comp.indikator.forEach(ind => {
+                    data.push([ind.id, ind.text, ind.skor === 1 ? 'v' : '', ind.skor === 2 ? 'v' : '', ind.skor === 3 ? 'v' : '', ind.skor === 4 ? 'v' : '', ind.catatan]);
+                });
+                let sum = comp.indikator.reduce((acc, curr) => acc + curr.skor, 0);
+                let avg = Number((sum / comp.indikator.length).toFixed(2));
+                data.push(["Nilai Total", sum, "", "", "", "Rata-rata", avg]);
+                data.push([]);
+            });
+
+            let ws = XLSX.utils.aoa_to_sheet(data);
+            XLSX.utils.book_append_sheet(wb, ws, "PKG Report");
+            XLSX.writeFile(wb, `PKG_${identitas.nama.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
+            showToast('File Excel berhasil diunduh!');
+        }
+    </script>
+</body>
+</html>
