@@ -400,13 +400,28 @@
                 pkgData,
                 identitas
             };
-            const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: "application/json" });
+
+            const blob = new Blob(
+                [JSON.stringify(dataToExport, null, 2)],
+                { type: "application/json" }
+            );
+
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `PKG_${identitas.nama.replace(/[^a-zA-Z0-9]/g, '_')}_Backup.json`;
+
+            // Membuat tanggal, bulan, tahun
+            const sekarang = new Date();
+            const tanggal = String(sekarang.getDate()).padStart(2, '0');
+            const bulan = String(sekarang.getMonth() + 1).padStart(2, '0');
+            const tahun = sekarang.getFullYear();
+
+            // Nama file JSON dengan tanggal di bagian akhir
+            a.download = `PKG_${identitas.nama.replace(/[^a-zA-Z0-9]/g, '_')}_${tanggal}-${bulan}-${tahun}.json`;
+
             a.click();
             URL.revokeObjectURL(url);
+
             showToast('Data PKG berhasil diekspor (Backup JSON)!');
         }
 
